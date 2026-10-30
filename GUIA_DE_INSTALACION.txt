@@ -1,0 +1,286 @@
+﻿=====================================================================
+  SISTEMA DE GESTION COMERCIAL - GRUPO 7
+  Guia de instalacion paso a paso (para hacer desde cero)
+=====================================================================
+
+Esta guia explica como dejar el programa funcionando en tu compu,
+aunque nunca hayas hecho nada de esto. Seguila en orden y sin
+saltearte pasos. Tarda mas o menos una hora la primera vez (casi todo
+es esperar que se instalen los programas).
+
+El sistema tiene dos partes que andan juntas:
+  - Gestion de Usuarios: el login, los usuarios y las contraseñas.
+  - Ventas (Grupo 7): presupuestos, notas de pedido, avisos y reportes.
+Las dos usan UNA sola base de datos, que se llama Sistema_Gestion.
+
+
+---------------------------------------------------------------------
+PASO 1. INSTALAR LOS PROGRAMAS (una sola vez)
+---------------------------------------------------------------------
+
+Necesitas tres programas. Si ya los tenes, saltea este paso.
+
+1.1. SQL Server Express (el motor de la base de datos)
+     - Busca en Google "SQL Server Express download" y entra a la
+       pagina de Microsoft.
+     - Descarga la version Express (es gratis). Sirve la 2019, 2022 o
+       una mas nueva.
+     - Abrí el instalador y elegí la opcion "Basica" (Basic).
+     - Aceptá todo con Siguiente / Aceptar hasta que termine.
+     - Al final te muestra una pantalla con datos. Anotá lo que dice
+       "Nombre de instancia" (casi siempre es SQLEXPRESS).
+
+1.2. SQL Server Management Studio, "SSMS" (para manejar la base)
+     - Busca en Google "descargar SSMS" y bajalo de la pagina de
+       Microsoft.
+     - Instalalo con todo lo que viene por defecto.
+
+1.3. Visual Studio Community (para abrir y correr el programa)
+     - Busca en Google "Visual Studio Community" y bajalo de la pagina
+       de Microsoft. Sirve la version 2022 o la 2026.
+     - Cuando se abre el instalador, te pregunta que "cargas de
+       trabajo" queres. Tildá:
+           [x] Desarrollo de escritorio de .NET
+     - Apretá Instalar y esperá (tarda bastante).
+
+
+---------------------------------------------------------------------
+PASO 2. CONSEGUIR EL PROYECTO
+---------------------------------------------------------------------
+
+Hay dos formas. Usá la que te hayan pasado.
+
+OPCION A: te pasaron un ZIP
+  - Hacé clic derecho en el ZIP > "Extraer todo..." > Extraer.
+  - Mové la carpeta TPI-Grupo7 a un lugar facil, por ejemplo
+    Documentos.
+  - IMPORTANTE: no trabajes adentro del ZIP sin extraerlo, no anda.
+
+OPCION B: el proyecto esta en GitHub
+  - Necesitas una cuenta de GitHub (es gratis, en github.com) y que el
+    dueño del repositorio te haya invitado. Te llega un mail: aceptá
+    la invitacion.
+  - Abrí Visual Studio. En la ventana de inicio elegí
+    "Clonar un repositorio".
+  - En "Ubicacion del repositorio" pegá el link que te pasaron
+    (algo como https://github.com/usuario/TPI-Grupo7).
+  - En "Ruta de acceso" elegí donde guardarlo (por ejemplo
+    Documentos\TPI-Grupo7) y apretá "Clonar".
+  - Si te pide iniciar sesion en GitHub, hacelo con tu cuenta.
+  - Mas abajo, en la seccion "TRABAJAR EN GRUPO CON GITHUB", esta
+    como subir y bajar cambios.
+
+
+---------------------------------------------------------------------
+PASO 3. CREAR LA BASE DE DATOS
+---------------------------------------------------------------------
+
+Adentro del proyecto hay una carpeta que se llama BaseDeDatos con
+cuatro archivos. Hay que ejecutarlos EN ORDEN: 0, 1, 2 y 3.
+
+3.1. Abrí SQL Server Management Studio (SSMS).
+
+3.2. Te aparece la ventana "Conectar al servidor":
+       - Tipo de servidor: Motor de base de datos
+       - Nombre del servidor: escribí  .\SQLEXPRESS
+         (es un punto, una barra invertida y SQLEXPRESS)
+       - Autenticacion: Autenticacion de Windows
+       - Si aparece la opcion "Certificado de servidor de confianza"
+         (Trust server certificate), tildala.
+     Apretá "Conectar".
+     -> Si no conecta, mirá "Problemas comunes" al final (punto A).
+
+3.3. Ejecutar el script 0:
+       - Menu Archivo > Abrir > Archivo... y buscá
+         BaseDeDatos\0_GestionUsuarios.sql
+       - Apretá el boton "Ejecutar" (o la tecla F5).
+       - Abajo tiene que decir "Gestión de Usuarios lista." y
+         "Los comandos se han completado correctamente".
+
+3.4. Repetí lo mismo con estos tres, en este orden:
+       - 1_TablasDeOtrosGrupos_SoloParaProbar.sql
+       - 2_ModuloGrupo7.sql
+       - 3_DatosYPruebas_Grupo7.sql
+     Al ejecutar el 3 tienen que aparecer abajo 8 renglones que dicen
+     "PRUEBA 1 OK" ... "PRUEBA 8 OK". Si dice OK, esta bien: son
+     pruebas que intentan hacer cosas prohibidas y la base las frena.
+
+Listo, la base esta creada con datos de ejemplo.
+
+Si mas adelante queres volver a dejar los datos de ejemplo como al
+principio, ejecutá de nuevo el 2 y despues el 3.
+
+
+---------------------------------------------------------------------
+PASO 4. ABRIR EL PROYECTO EN VISUAL STUDIO
+---------------------------------------------------------------------
+
+4.1. Entrá a la carpeta TPI-Grupo7 y hacé doble clic en
+     SistemaVentas.sln
+     (Si Windows pregunta con que abrirlo, elegí Visual Studio.)
+
+4.2. A la derecha vas a ver el "Explorador de soluciones" con 5
+     proyectos:
+       - Vista_usuario   (login y usuarios)
+       - CapaVista       (pantallas de Ventas)
+       - CapaLogica
+       - CapaDatos
+       - CapaEntidades
+
+4.3. SOLO SI tu servidor NO se llama .\SQLEXPRESS:
+     abrí CapaVista > appsettings.json y cambiá lo que esta despues de
+     "Data Source=" por el nombre de tu servidor. Ojo: adentro de ese
+     archivo las barras invertidas van dobles. Por ejemplo:
+         .\\SQLEXPRESS     o     localhost
+     Es el unico lugar donde se configura la conexion.
+
+4.4. Marcar el proyecto que arranca:
+     clic derecho sobre "Vista_usuario" > "Establecer como proyecto de
+     inicio". Tiene que quedar en negrita.
+
+4.5. Compilar: menu Compilar > Recompilar solucion.
+     Abajo tiene que decir "5 correctos, 0 erróneos" (puede tardar la
+     primera vez porque baja cosas de internet: tenes que estar
+     conectado).
+
+4.6. Apretá F5 (o el boton verde "Vista_usuario"). Se abre el login.
+
+
+---------------------------------------------------------------------
+PASO 5. ENTRAR AL SISTEMA
+---------------------------------------------------------------------
+
+Todos los usuarios de prueba tienen la misma contraseña:
+
+        Ventas.2026
+
+(con V mayuscula y un punto antes del 2026)
+
+  Usuario   Rol              Que puede hacer
+  --------  ---------------  -----------------------------------------
+  admin     Administrador    Crear, editar y dar de baja usuarios.
+                             Cambiar las politicas de seguridad.
+  jperez    Vendedor         Presupuestos, notas de pedido y reportes
+  mgomez    Vendedor         de ventas.
+  rlopez    Deposito         Avisos de mercaderia preparada y reportes
+                             de deposito.
+  lsosa     Usuario general  "Otros modulos" (todavia en construccion).
+
+Todos tienen ademas "Mi cuenta", para cambiar su contraseña o sus
+preguntas de seguridad.
+
+Prueba recomendada (el circuito completo):
+  1. Entrá con jperez > Presupuestos y pedidos de venta > Presupuestos.
+     Apretá "+ Nuevo presupuesto", elegí un cliente, agregá productos y
+     Guardar. En la lista, apretá el tilde verde para aprobarlo.
+  2. Andá a Notas de pedido > "+ Nueva nota de pedido" > "Desde un
+     presupuesto aprobado", elegí el tuyo y Guardar.
+  3. Cerrá sesion y entrá con rlopez > Avisos > "+ Nuevo aviso".
+     Elegí el pedido, Guardar. El pedido pasa a "Preparado".
+  4. Volvé a entrar con jperez > Notas de pedido. En tu pedido apretá
+     la cajita (Entregado) y despues la tarjeta (Facturado).
+
+
+---------------------------------------------------------------------
+PASO 6 (OPCIONAL). QUE EL SISTEMA MANDE CORREOS
+---------------------------------------------------------------------
+
+El sistema manda mails en tres casos: cuando el administrador crea un
+usuario (le manda su contraseña), cuando alguien recupera su
+contraseña y, si esta activado, el codigo de ingreso en dos pasos.
+
+Para que funcione hace falta el archivo Vista_usuario\correo.json con
+la cuenta de Gmail del sistema. Ese archivo NO viene en el ZIP ni en
+GitHub a proposito (tiene una contraseña). Pediselo por privado al
+que la tiene y copialo adentro de la carpeta Vista_usuario.
+Hay un modelo vacio que se llama correo.ejemplo.json.
+
+Sin ese archivo el programa anda igual. Lo unico que pasa es que al
+crear un usuario, la contraseña temporal aparece en pantalla en vez de
+llegar por mail.
+
+
+---------------------------------------------------------------------
+TRABAJAR EN GRUPO CON GITHUB (si usan la Opcion B)
+---------------------------------------------------------------------
+
+Todo se hace desde Visual Studio, sin escribir comandos. Las palabras
+importantes:
+  - Extraer (Pull) = bajar los cambios que subieron los demas.
+  - Confirmar (Commit) = guardar tus cambios con un mensaje.
+  - Insertar (Push) = subir tus cambios a GitHub para que los vean.
+
+Cada vez que te sentas a trabajar:
+  1. Menu Git > "Extraer". Asi arrancas con lo ultimo de todos.
+  2. Trabajá normalmente y probá que compile y funcione.
+  3. Abrí la ventana Git > "Cambios de Git" (Git Changes).
+  4. Arriba escribí un mensaje corto que diga que hiciste, por ejemplo
+     "Arreglo el filtro de presupuestos".
+  5. Apretá "Confirmar todo".
+  6. Apretá "Insertar" (la flecha para arriba).
+
+Reglas para no pisarse:
+  - Siempre "Extraer" ANTES de empezar a trabajar.
+  - Avisen por el grupo quien esta tocando que pantalla. Si dos
+    modifican el mismo formulario a la vez, Git no sabe con cual
+    quedarse y hay que arreglarlo a mano.
+  - No suban nada que no compile.
+  - Si Visual Studio dice que hay "conflictos" y no sabes que hacer,
+    no aprietes nada y pedí ayuda.
+
+Solo para el DUEÑO del proyecto (se hace una vez):
+  1. Abrí SistemaVentas.sln en Visual Studio.
+  2. Menu Git > "Crear repositorio Git...".
+  3. Elegí GitHub, iniciá sesion, poné de nombre TPI-Grupo7 y dejá
+     tildado "Privado".
+  4. Apretá "Crear e insertar".
+  5. Entrá a github.com > tu repositorio > Settings > Collaborators >
+     "Add people" y agregá a tus compañeros por su usuario de GitHub.
+  6. Pasales el link del repositorio.
+  El archivo correo.json NO se sube (esta en .gitignore). Pasalo por
+  privado.
+
+
+---------------------------------------------------------------------
+PROBLEMAS COMUNES
+---------------------------------------------------------------------
+
+A) SSMS no conecta / el programa dice "Error al conectar" o "no se
+   encontro el servidor":
+   - Probá como nombre de servidor:  .\SQLEXPRESS  ,  localhost  ,
+     o  (localdb)\MSSQLLocalDB
+   - Para saber el nombre exacto: abrí el programa "Servicios" de
+     Windows y buscá uno que diga "SQL Server (ALGO)". Ese ALGO es el
+     nombre de la instancia: el servidor es .\ALGO
+   - Fijate que ese servicio este "En ejecucion". Si no, clic derecho
+     > Iniciar.
+   - Despues de cambiar appsettings.json, hacé Recompilar solucion.
+
+B) "Cannot open database Sistema_Gestion" o "no se puede abrir la base
+   de datos": no ejecutaste los scripts del Paso 3, o los ejecutaste
+   en otro servidor. Volvé al Paso 3.
+
+C) Visual Studio dice "Un proyecto con un tipo de salida de biblioteca
+   de clases no se puede iniciar directamente": te falto el paso 4.4
+   (marcar Vista_usuario como proyecto de inicio).
+
+D) Al compilar dice que un archivo "esta siendo utilizado por otro
+   proceso": el programa quedo abierto. Cerralo (o apretá el cuadrado
+   rojo de Visual Studio) y volvé a compilar.
+
+E) Errores de "paquetes NuGet" la primera vez que compilas: conectate
+   a internet y hacé clic derecho en la solucion > "Restaurar paquetes
+   NuGet". Despues Recompilar solucion.
+
+F) El login dice "Usuario o contraseña incorrectos": la contraseña es
+   Ventas.2026 (mayuscula al principio, con el punto). Si la base se
+   creo hace mucho, ejecutá de nuevo el script 1: vuelve a poner esa
+   contraseña a jperez, mgomez y rlopez.
+
+G) Al crear un usuario dice "No se pudo mandar el correo": falta el
+   archivo correo.json (Paso 6). El usuario igual se creo: la
+   contraseña temporal aparece en ese mismo cartel.
+
+H) Al ejecutar un script en SSMS aparecen errores en rojo: fijate que
+   los hayas ejecutado en orden (0, 1, 2, 3) y que arriba a la
+   izquierda estes conectado al servidor correcto.

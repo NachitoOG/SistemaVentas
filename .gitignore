@@ -1,0 +1,5 @@
+﻿bin/
+obj/
+.vs/
+*.user
+Vista_usuario/correo.json
