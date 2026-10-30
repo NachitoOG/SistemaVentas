@@ -48,27 +48,23 @@ Necesitas tres programas. Si ya los tenes, saltea este paso.
 PASO 2. CONSEGUIR EL PROYECTO
 ---------------------------------------------------------------------
 
-Hay dos formas. Usá la que te hayan pasado.
+El proyecto esta en GitHub (una pagina donde se guarda el codigo para
+que todo el grupo trabaje sobre la misma version).
 
-OPCION A: te pasaron un ZIP
-  - Hacé clic derecho en el ZIP > "Extraer todo..." > Extraer.
-  - Mové la carpeta TPI-Grupo7 a un lugar facil, por ejemplo
-    Documentos.
-  - IMPORTANTE: no trabajes adentro del ZIP sin extraerlo, no anda.
+  1. Creá una cuenta en github.com (es gratis) y pasale tu nombre de
+     usuario al dueño del proyecto para que te invite.
+  2. Te va a llegar un mail de GitHub con la invitacion: aceptala.
+  3. Abrí Visual Studio. En la ventana de inicio elegí
+     "Clonar un repositorio".
+  4. En "Ubicacion del repositorio" pegá este link:
+         https://github.com/NachitoOG/SistemaVentas
+  5. En "Ruta de acceso" elegí donde guardarlo (por ejemplo
+     Documentos\SistemaVentas) y apretá "Clonar".
+  6. Si te pide iniciar sesion en GitHub, hacelo con tu cuenta.
 
-OPCION B: el proyecto esta en GitHub
-  - Necesitas una cuenta de GitHub (es gratis, en github.com) y que el
-    dueño del repositorio te haya invitado. Te llega un mail: aceptá
-    la invitacion.
-  - Abrí Visual Studio. En la ventana de inicio elegí
-    "Clonar un repositorio".
-  - En "Ubicacion del repositorio" pegá el link que te pasaron
-    (algo como https://github.com/usuario/TPI-Grupo7).
-  - En "Ruta de acceso" elegí donde guardarlo (por ejemplo
-    Documentos\TPI-Grupo7) y apretá "Clonar".
-  - Si te pide iniciar sesion en GitHub, hacelo con tu cuenta.
-  - Mas abajo, en la seccion "TRABAJAR EN GRUPO CON GITHUB", esta
-    como subir y bajar cambios.
+"Clonar" quiere decir bajar el proyecto a tu compu. Se hace una sola
+vez. Despues, para bajar o subir cambios, mirá la seccion
+"TRABAJAR EN GRUPO CON GITHUB" mas abajo.
 
 
 ---------------------------------------------------------------------
@@ -115,7 +111,7 @@ principio, ejecutá de nuevo el 2 y despues el 3.
 PASO 4. ABRIR EL PROYECTO EN VISUAL STUDIO
 ---------------------------------------------------------------------
 
-4.1. Entrá a la carpeta TPI-Grupo7 y hacé doble clic en
+4.1. Entrá a la carpeta del proyecto y hacé doble clic en
      SistemaVentas.sln
      (Si Windows pregunta con que abrirlo, elegí Visual Studio.)
 
@@ -190,8 +186,8 @@ usuario (le manda su contraseña), cuando alguien recupera su
 contraseña y, si esta activado, el codigo de ingreso en dos pasos.
 
 Para que funcione hace falta el archivo Vista_usuario\correo.json con
-la cuenta de Gmail del sistema. Ese archivo NO viene en el ZIP ni en
-GitHub a proposito (tiene una contraseña). Pediselo por privado al
+la cuenta de Gmail del sistema. Ese archivo NO esta en GitHub a
+proposito (tiene una contraseña). Pediselo por privado al
 que la tiene y copialo adentro de la carpeta Vista_usuario.
 Hay un modelo vacio que se llama correo.ejemplo.json.
 
@@ -201,7 +197,7 @@ llegar por mail.
 
 
 ---------------------------------------------------------------------
-TRABAJAR EN GRUPO CON GITHUB (si usan la Opcion B)
+TRABAJAR EN GRUPO CON GITHUB
 ---------------------------------------------------------------------
 
 Todo se hace desde Visual Studio, sin escribir comandos. Las palabras
@@ -231,8 +227,8 @@ Reglas para no pisarse:
 Solo para el DUEÑO del proyecto (se hace una vez):
   1. Abrí SistemaVentas.sln en Visual Studio.
   2. Menu Git > "Crear repositorio Git...".
-  3. Elegí GitHub, iniciá sesion, poné de nombre TPI-Grupo7 y dejá
-     tildado "Privado".
+  3. Elegí GitHub, iniciá sesion, poné de nombre SistemaVentas y
+     dejá tildado "Privado".
   4. Apretá "Crear e insertar".
   5. Entrá a github.com > tu repositorio > Settings > Collaborators >
      "Add people" y agregá a tus compañeros por su usuario de GitHub.
