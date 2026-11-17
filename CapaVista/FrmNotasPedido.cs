@@ -27,6 +27,11 @@ namespace CapaVista
             cargando = false;
 
             ListarNotas();
+
+            cboFiltroCliente.DropDownStyle = ComboBoxStyle.DropDown;
+            cboFiltroCliente.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
+            cboFiltroCliente.AutoCompleteSource = AutoCompleteSource.ListItems;
+
         }
 
         private void Filtros_Cambiaron(object sender, EventArgs e)

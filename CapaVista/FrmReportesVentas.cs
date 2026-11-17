@@ -171,6 +171,11 @@ namespace CapaVista
 
         private void Generar()
         {
+            if (!PeriodoValido())
+            {
+                return;
+            }
+
             try
             {
                 int reporte = ReporteElegido();
@@ -260,6 +265,29 @@ namespace CapaVista
                 lblCantidadRegistros.ForeColor = Color.Firebrick;
                 lblCantidadRegistros.Text = ex.Message;
             }
+        }
+
+        private bool PeriodoValido()
+        {
+            if (chkDesde.Enabled && chkDesde.Checked && chkHasta.Enabled && chkHasta.Checked &&
+                dtpDesde.Value.Date > dtpHasta.Value.Date)
+            {
+                MostrarAviso("No se puede utilizar una fecha Desde posterior a la fecha Hasta.");
+
+                cargando = true;
+                chkDesde.Checked = false;
+                chkHasta.Checked = false;
+                dtpDesde.Value = DateTime.Today.AddMonths(-1);
+                dtpHasta.Value = DateTime.Today;
+                cargando = false;
+
+                dgvReporte.DataSource = null;
+                lblCantidadRegistros.ForeColor = SystemColors.ControlText;
+                lblCantidadRegistros.Text = "Filas: 0";
+                return false;
+            }
+
+            return true;
         }
 
         private void Titulo(string columna, string texto)

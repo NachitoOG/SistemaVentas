@@ -1,9 +1,10 @@
+using CapaEntidades;
+using CapaLogica;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
-using CapaEntidades;
-using CapaLogica;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace CapaVista
 {
@@ -27,6 +28,9 @@ namespace CapaVista
             cargando = false;
 
             ListarPresupuestos();
+            cboFiltroCliente.DropDownStyle = ComboBoxStyle.DropDown;
+            cboFiltroCliente.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
+            cboFiltroCliente.AutoCompleteSource = AutoCompleteSource.ListItems;
         }
 
         private void Filtros_Cambiaron(object sender, EventArgs e)

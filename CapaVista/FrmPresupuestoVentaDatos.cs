@@ -60,6 +60,14 @@ namespace CapaVista
             }
 
             MostrarLineas();
+
+            cboCliente.DropDownStyle = ComboBoxStyle.DropDown;
+            cboCliente.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
+            cboCliente.AutoCompleteSource = AutoCompleteSource.ListItems;
+
+            cboProducto.DropDownStyle = ComboBoxStyle.DropDown;
+            cboProducto.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
+            cboProducto.AutoCompleteSource = AutoCompleteSource.ListItems;
         }
 
         private void btnGuardar_Click(object sender, EventArgs e)

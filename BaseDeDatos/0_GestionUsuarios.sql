@@ -796,7 +796,7 @@ BEGIN
     SELECT @IdRol = id_rol FROM dbo.Roles WHERE Roles = N'Administrador';
     SET @Clave = LOWER(CONVERT(VARCHAR(64), HASHBYTES('SHA2_256', 'Ventas.2026' + 'admin'), 2));
 
-    EXEC dbo.sp_RegistrarUsuario 'Administrador', 'Sistema', 'admin@ejemplo.com', @IdTipoDoc, '30000001', 'admin', @Clave, 1, @IdRol;
+    EXEC dbo.sp_RegistrarUsuario 'Administrador', 'Sistema', 'collaeze2@gmail.com', @IdTipoDoc, '30000001', 'admin', @Clave, 1, @IdRol;
 
     UPDATE dbo.Usuario SET debe_cambiar_clave = 0 WHERE usuario = 'admin';
 END;

@@ -1,0 +1,1036 @@
+﻿=====================================================================
+  SISTEMA DE GESTIÓN COMERCIAL - GRUPO 7
+  Explicación del código (para preparar la defensa oral)
+=====================================================================
+
+Este archivo explica QUÉ hace cada parte del programa, DÓNDE está y
+POR QUÉ está hecha así. Si el profe pregunta "¿dónde está tal cosa?",
+buscala con Ctrl+F (por ejemplo "deudor", "hash", "baja",
+"transacción") o andá directo a la sección 10, que es un índice
+rápido.
+
+Orden recomendado para estudiar:
+  1. Secciones 1 a 3 (la idea general y el viaje de un clic).
+     Con eso ya podés explicar cómo está armado el sistema.
+  2. Sección 10 (dónde está cada cosa) y 11 (preguntas probables).
+  3. El resto, para entender cada clase en detalle.
+
+ÍNDICE
+  1. Qué hace el sistema (en 30 segundos)
+  2. Cómo está armada la solución (los 5 proyectos)
+  3. El viaje de un clic: qué pasa cuando guardás un presupuesto
+  4. La base de datos (scripts, tablas, vistas, procedimientos)
+  5. CapaEntidades
+  6. CapaDatos
+  7. CapaLogica (las reglas del negocio)
+  8. CapaVista (las pantallas de Ventas)
+  9. Vista_usuario (Gestión de Usuarios)
+ 10. ¿Dónde está...? (índice rápido para la defensa)
+ 11. Preguntas que puede hacer el profe, con respuesta
+ 12. Cosas de C# que aparecen en el código y qué significan
+
+
+---------------------------------------------------------------------
+1. QUÉ HACE EL SISTEMA (EN 30 SEGUNDOS)
+---------------------------------------------------------------------
+
+Es el módulo "Presupuestos y Pedidos de Venta" (Grupo 7), conectado
+con un módulo de Gestión de Usuarios que maneja el login.
+
+El circuito de una venta es:
+
+  PRESUPUESTO  ->  NOTA DE PEDIDO  ->  AVISO DE MERCADERÍA PREPARADA
+  (Ventas)         (Ventas)            (Depósito)
+
+  1. El vendedor le hace un PRESUPUESTO al cliente (Pendiente).
+  2. El cliente dice que sí o que no: el vendedor lo marca Aprobado
+     o Rechazado.
+  3. Con un presupuesto Aprobado se genera la NOTA DE PEDIDO (o se
+     hace una nota directa, sin presupuesto). La nota nace Pendiente.
+  4. Depósito prepara la mercadería y carga el AVISO. Al cargarlo,
+     la nota pasa sola a Preparado.
+  5. El vendedor marca la nota como Entregado y después Facturado.
+
+Estados de una nota de pedido, siempre en este orden:
+  Pendiente -> Preparado -> Entregado -> Facturado
+
+Además hay 5 reportes (los que pide la consigna).
+
+Roles (4 roles en 3 grupos, como pidió el profe):
+  - Grupo Administración: rol Administrador -> administra usuarios y
+    políticas de seguridad.
+  - Grupo Ventas: rol Vendedor -> presupuestos, notas, reportes 1 y 2.
+                  rol Depósito -> avisos, reportes 3, 4 y 5.
+  - Grupo Otros módulos: rol Usuario general -> pantalla "en
+    construcción".
+
+Nada se borra de verdad: todo usa BAJA LÓGICA (una columna Activo o
+estado que pasa a 0). Así no se pierde el historial.
+
+
+---------------------------------------------------------------------
+2. CÓMO ESTÁ ARMADA LA SOLUCIÓN (LOS 5 PROYECTOS)
+---------------------------------------------------------------------
+
+La solución es SistemaVentas.sln y tiene 5 proyectos:
+
+  Vista_usuario   -> Gestión de Usuarios (login, home, usuarios,
+                     políticas). Es el PROYECTO DE INICIO (el que
+                     arranca con F5). Está en programación
+                     estructurada (sin capas) porque así lo pidió el
+                     profe para ese módulo.
+
+  CapaVista       -> Las pantallas de Ventas (formularios).
+  CapaLogica      -> Las reglas del negocio (clases CN_).
+  CapaDatos       -> El acceso a la base (clases CD_).
+  CapaEntidades   -> Las clases que representan los datos
+                     (PresupuestoVenta, NotaPedido, etc.).
+
+Las 4 "Capa..." son la arquitectura N-CAPAS del modelo del profe
+(GestionPersonas). Cada capa solo habla con la de abajo:
+
+  CapaVista  ->  CapaLogica  ->  CapaDatos  ->  SQL Server
+       \              \              \
+        \______________\______________\___ todas usan CapaEntidades
+
+Quién referencia a quién (Proyecto -> Agregar referencia):
+  CapaEntidades : no referencia a nadie.
+  CapaDatos     : CapaEntidades.
+  CapaLogica    : CapaDatos y CapaEntidades.
+  CapaVista     : CapaLogica y CapaEntidades.
+  Vista_usuario : CapaVista (para poder abrir el menú de Ventas).
+
+¿Por qué separar en capas?
+  - Si mañana cambia la base de datos, solo se toca CapaDatos.
+  - Las reglas (por ejemplo "no se puede aprobar un presupuesto ya
+    aprobado") están en UN solo lugar: CapaLogica. Ninguna pantalla
+    puede saltearlas.
+  - La pantalla no sabe nada de SQL: solo muestra cosas y llama a la
+    lógica.
+
+Todo es .NET 8 (las bibliotecas net8.0 y las pantallas
+net8.0-windows). Para SQL Server se usa el paquete NuGet
+Microsoft.Data.SqlClient.
+
+La cadena de conexión está en UN solo lugar:
+  CapaVista\appsettings.json  (clave "SistemaVentas")
+Los dos módulos (Ventas y Usuarios) leen ese mismo archivo.
+
+
+---------------------------------------------------------------------
+3. EL VIAJE DE UN CLIC: QUÉ PASA CUANDO GUARDÁS UN PRESUPUESTO
+---------------------------------------------------------------------
+
+Esto es lo más importante para entender TODO el sistema, porque las
+notas y los avisos funcionan exactamente igual.
+
+PASO A - La pantalla (CapaVista\FrmPresupuestoVentaDatos.cs)
+  El usuario toca "Guardar". Se ejecuta btnGuardar_Click.
+  - Arma un objeto PresupuestoVenta con lo que hay en los combos y
+    la fecha (cliente, usuario, fecha) y le pasa las líneas.
+  - Llama a cnPresupuestos.Alta(nuevo).
+  - Todo está dentro de un try/catch: si algo sale mal, muestra el
+    mensaje del error en un MessageBox y no se cierra la ventana.
+  - Si sale bien, pone this.DialogResult = DialogResult.OK; eso
+    cierra la ventana y le avisa a la lista que tiene que recargar.
+
+PASO B - La lógica (CapaLogica\CN_PresupuestosVenta.cs)
+  Método Alta(presupuesto):
+  - Llama a Validar(presupuesto), que revisa las reglas: que haya
+    cliente, que haya usuario, que el usuario NO sea de Depósito, que
+    la fecha no sea futura, que haya al menos una línea, y cada línea
+    (producto elegido, cantidad mayor a 0, precio no negativo).
+  - Si algo no cumple, tira un ArgumentException con un mensaje
+    claro. Ese mensaje es el que después ve el usuario.
+  - Si todo está bien, llama a cdPresupuestos.Alta(presupuesto), que
+    devuelve el número (ID) nuevo.
+  - Después guarda las líneas una por una (GuardarLineas).
+
+PASO C - Los datos (CapaDatos\CD_PresupuestosVenta.cs)
+  Método Alta(presupuesto):
+  - Arma los SqlParameter (@FK_Cliente, @FK_Usuario, @Fecha_Emision)
+    y uno de SALIDA (@ID, Direction = Output) para recibir el número
+    nuevo.
+  - Llama a EjecutarConsulta("dbo.sp_PresupuestoVenta_Alta", ...),
+    que está en la clase padre CD_EjecutarConsultasSP.
+  - Devuelve (int)pId.Value, o sea el ID que generó la base.
+
+PASO D - La base (BaseDeDatos\2_ModuloGrupo7.sql)
+  El procedimiento almacenado dbo.sp_PresupuestoVenta_Alta vuelve a
+  validar (por si alguien lo llama desde otro lado), hace el INSERT y
+  devuelve el ID con SCOPE_IDENTITY().
+
+¿Y si la base encuentra un error?
+  El procedimiento hace RAISERROR('mensaje', 16, 1). En C#, eso llega
+  como una SqlException con número 50000. CD_EjecutarConsultasSP la
+  atrapa y la convierte en una Exception común con el mismo mensaje.
+  Sube por la lógica hasta la pantalla, y el catch de la pantalla la
+  muestra. Por eso el usuario siempre ve un mensaje entendible y el
+  programa nunca se cierra de golpe.
+
+Resumen del viaje:
+  Pantalla -> CN (valida) -> CD (arma parámetros) -> SP (valida y
+  guarda) -> devuelve el ID -> la pantalla muestra "Número asignado".
+
+
+---------------------------------------------------------------------
+4. LA BASE DE DATOS
+---------------------------------------------------------------------
+
+Una sola base: Sistema_Gestion (en .\SQLEXPRESS). Los scripts están
+en la carpeta BaseDeDatos y se corren en orden:
+
+  0_GestionUsuarios.sql
+     Crea las tablas del módulo de usuarios (Usuario, Persona, Roles,
+     Familia, Roles_Familia, usuario_roles, Historial_Pass,
+     Preguntas, Respuestas, Politicas_Seguridad, Tipodoc, Permisos) y
+     sus procedimientos. Crea los 3 grupos con sus 4 roles y los
+     usuarios admin y lsosa. NO borra nada: si algo ya existe, lo
+     deja (usa IF OBJECT_ID(...) IS NULL antes de crear).
+
+  1_TablasDeOtrosGrupos_SoloParaProbar.sql
+     Crea versiones chiquitas de Clientes (Grupo 6) y Productos
+     (Grupo 1) solo si no existen, para poder probar sin los otros
+     grupos. Crea los usuarios jperez, mgomez (vendedores) y rlopez
+     (Depósito).
+
+  2_ModuloGrupo7.sql
+     NUESTRO MÓDULO: las 5 tablas, las vistas y todos los
+     procedimientos. Solo borra y recrea nuestras 5 tablas.
+
+  3_DatosYPruebas_Grupo7.sql
+     Carga datos de ejemplo y corre 8 pruebas automáticas. Cada una
+     intenta hacer algo prohibido (por ejemplo, una línea con cantidad
+     0, o generar dos pedidos del mismo presupuesto) y tiene que salir
+     "PRUEBA n OK (rechazo esperado)".
+
+LAS 5 TABLAS DEL GRUPO 7 (cabecera + detalle):
+
+  Presupuestos_Venta          (cabecera)
+     ID, FK_Cliente, FK_Usuario, Fecha_Emision, Estado, Activo
+     Estado solo puede ser Pendiente, Aprobado o Rechazado
+     (CHECK CK_Presupuestos_Estado).
+
+  Detalle_Presupuestos_Venta  (las líneas del presupuesto)
+     ID, FK_Presupuesto_Venta, FK_Producto, Cantidad, Precio_Unitario
+     CHECK: Cantidad > 0 y Precio_Unitario >= 0.
+
+  Notas_Pedido                (cabecera)
+     ID, FK_Cliente, FK_Usuario, FK_Presupuesto_Venta, Fecha_Emision,
+     Estado, Activo
+     FK_Presupuesto_Venta acepta NULL: si es NULL, es un pedido
+     directo (sin presupuesto).
+     Estado: Pendiente, Preparado, Entregado o Facturado.
+
+  Detalle_Notas_Pedido        (las líneas del pedido)
+     Igual que el detalle del presupuesto.
+
+  Avisos_Mercaderia_Preparada
+     ID, FK_Nota_Pedido, FK_Usuario, Fecha_Emision, Activo
+
+Por qué cabecera y detalle: un presupuesto tiene MUCHOS productos.
+No se puede guardar una lista dentro de una fila, entonces la
+cabecera va en una tabla y cada producto es una fila en la tabla de
+detalle, unida por la clave foránea (FK).
+
+Claves:
+  - PK (primary key): el ID de cada tabla, IDENTITY(1,1) = lo
+    numera solo la base (1, 2, 3...). Los ID no se modifican nunca.
+  - FK (foreign key): asegura que no puedas poner un cliente,
+    producto, usuario o presupuesto que no exista.
+  - CHECK: reglas que la base controla sí o sí (estados válidos,
+    cantidad > 0).
+  - DEFAULT: valor por defecto (Estado 'Pendiente', Activo 1, fecha
+    GETDATE()).
+
+LAS VISTAS (VIEW = una consulta guardada con nombre):
+
+  Vistas "adaptadoras" (para no depender de cómo los otros grupos
+  nombran sus columnas):
+    vw_Ventas_Clientes  -> lee Clientes
+    vw_Ventas_Productos -> lee Productos
+    vw_Ventas_Usuarios  -> lee Usuario + Persona + roles. Si el
+                           usuario tiene el rol "Depósito", devuelve
+                           el rol como 'Deposito' (sin tilde), que es
+                           lo que espera el C#.
+  Si otro grupo cambia sus columnas, solo se ajusta la vista, no el
+  C#.
+
+  Vistas para listar:
+    vw_Presupuesto_Venta -> presupuesto + nombre del cliente + nombre
+                            del usuario + TOTAL (suma de cantidad x
+                            precio de sus líneas).
+    vw_Nota_Pedido       -> lo mismo para las notas.
+    vw_Aviso_Mercaderia  -> aviso + datos del pedido.
+
+  vw_Ventas_DeudaClientes -> LA LISTA NEGRA. Suma el total de las
+                             notas activas en estado Entregado de cada
+                             cliente. Entregado = el cliente ya tiene
+                             la mercadería pero todavía no se le
+                             facturó = debe plata.
+
+LOS PROCEDIMIENTOS ALMACENADOS (sp_...):
+  Toda operación pasa por un procedimiento, como en el modelo del
+  profe. Por entidad hay: _Alta, _Modificar, _Baja, _Consultar,
+  _Listar y los especiales:
+    sp_PresupuestoVenta_CambiarEstado   (aprobar / rechazar)
+    sp_NotaPedido_GenerarDesdePresupuesto
+    sp_NotaPedido_CambiarEstado         (entregado / facturado)
+    sp_Detalle..._Alta / _BorrarPorPresupuesto / _Listar
+    sp_Ventas_ListarClientes / ListarProductos / ListarUsuarios
+    sp_Rpt_... (los 5 reportes)
+
+TRANSACCIONES (BEGIN TRANSACTION / COMMIT / ROLLBACK):
+  Se usan cuando una operación toca DOS cosas y tienen que pasar las
+  dos o ninguna:
+  - sp_Aviso_Alta: inserta el aviso Y pasa la nota a 'Preparado'.
+  - sp_Aviso_Baja: da de baja el aviso Y vuelve la nota a 'Pendiente'.
+  - sp_NotaPedido_GenerarDesdePresupuesto: crea la nota Y copia todas
+    las líneas del presupuesto (INSERT ... SELECT).
+  Si algo falla en el medio, el BEGIN CATCH hace ROLLBACK (deshace
+  todo) y vuelve a tirar el error con RAISERROR.
+
+SCOPE_IDENTITY(): devuelve el ID que se acaba de generar en el
+INSERT. Se guarda en el parámetro de salida @ID.
+
+
+---------------------------------------------------------------------
+5. CAPAENTIDADES
+---------------------------------------------------------------------
+
+Son clases "molde": solo tienen datos (propiedades), constructores y
+algún cálculo chico. No hablan con la base ni muestran nada.
+
+  PresupuestoVenta
+    - Constantes PENDIENTE, APROBADO, RECHAZADO (así no se escribe
+      "Aprobado" a mano en 20 lugares y no hay errores de tipeo).
+    - Propiedades: IdPresupuesto, IdCliente, NombreCliente, IdUsuario,
+      NombreUsuario, FechaEmision, Estado, Activo, Total, Lineas.
+    - Lineas es una List<DetallePresupuestoVenta>.
+    - EstadoTexto: si está dado de baja devuelve "Dado de baja", si
+      no, el estado. Es lo que se ve en la grilla.
+    - CalcularTotal(): recorre las líneas con foreach y suma los
+      subtotales.
+    - Tres constructores encadenados con : this(...): el vacío pone
+      los valores por defecto (fecha de hoy, Pendiente, activo, lista
+      vacía); los otros reciben datos y llaman al anterior.
+
+  DetallePresupuestoVenta / DetalleNotaPedido
+    - IdProducto, NombreProducto, Cantidad (int, porque solo se
+      venden unidades enteras), PrecioUnitario (decimal, porque es
+      plata).
+    - Subtotal = Cantidad * PrecioUnitario (propiedad calculada, solo
+      tiene get).
+
+  NotaPedido
+    - Igual que el presupuesto, con 4 estados (PENDIENTE, PREPARADO,
+      ENTREGADO, FACTURADO).
+    - IdPresupuesto es int? (puede ser null = pedido directo).
+    - Origen: devuelve "Pedido directo" o "Presupuesto N° x".
+
+  AvisoMercaderia
+    - IdAviso, IdNotaPedido, IdUsuario, FechaEmision, Activo y datos
+      del pedido para mostrar.
+    - HorasPreparacion: resta FechaEmision - FechaPedido y da las
+      horas que tardó Depósito.
+
+  ClienteVentas, ProductoVentas, UsuarioVentas
+    - Representan datos de OTROS grupos (clientes, productos,
+      usuarios). Se llaman "...Ventas" para no chocar con las clases
+      Cliente/Producto/Usuario de los otros grupos cuando se junte
+      todo.
+    - ClienteVentas.Deuda y EsDeudor (Deuda > 0): para la lista negra.
+    - UsuarioVentas.ROL_DEPOSITO = "Deposito" y EsDeposito (Rol ==
+      ROL_DEPOSITO): para saber si el usuario es de Depósito.
+    - Tienen override ToString() para que se vean bien en un combo.
+
+  Reporte... (5 clases)
+    Una por reporte, con las columnas que muestra cada uno.
+
+
+---------------------------------------------------------------------
+6. CAPADATOS
+---------------------------------------------------------------------
+
+  Conexion.cs (clase abstracta)
+    - GetConexion(): devuelve un SqlConnection nuevo.
+    - La cadena se lee UNA vez del archivo appsettings.json (con
+      JsonDocument) y se guarda en una variable static, así no se lee
+      el archivo cada vez.
+    - Si el archivo no está o está mal escrito, tira un error que
+      explica qué pasa.
+
+  CD_EjecutarConsultasSP.cs (clase abstracta, hereda de Conexion)
+    Es la del modelo del profe. TODAS las clases CD_ heredan de esta.
+    - EjecutarConsulta(nombreSP, parametros, devuelveDatos):
+        abre la conexión, arma un SqlCommand de tipo StoredProcedure,
+        le agrega los parámetros y:
+          - si devuelveDatos es true: ExecuteReader y carga un
+            DataTable (para listar).
+          - si es false: ExecuteNonQuery (para alta, baja, modificar).
+        Los "using" cierran la conexión solos aunque haya un error.
+    - Los catch:
+        SqlException con Number 50000 = error que tiramos nosotros con
+        RAISERROR -> pasa el mensaje tal cual.
+        Cualquier otra SqlException -> "No se pudo acceder a la base
+        de datos" + detalle.
+    - ValorONulo(...) (3 versiones: texto, int?, DateTime?): si el
+      valor está vacío o es null, manda DBNull.Value a la base. Sirve
+      para los filtros opcionales ("(Todos)").
+
+  CD_PresupuestosVenta, CD_NotasPedido, CD_Avisos
+    Un método por procedimiento: Alta, Modificar, CambiarEstado, Baja,
+    Listar, Consultar, ObtenerPorId.
+    - Alta usa un parámetro de salida (@ID) para devolver el número
+      nuevo.
+    - ConvertirALista(DataTable): recorre las filas (foreach DataRow)
+      y por cada una arma un objeto con Convert.ToInt32,
+      Convert.ToDateTime, etc. Así la lógica y la vista trabajan con
+      objetos y nunca con tablas.
+    - ObtenerPorId llama a Consultar con ese ID y devuelve el primero
+      (o null si no hay).
+
+  CD_DetallesPresupuestoVenta, CD_DetallesNotaPedido
+    Alta (una línea), BorrarPorPresupuesto / BorrarPorNotaPedido,
+    Listar (las líneas de un documento).
+
+  CD_ListasVentas
+    ListarClientes (con la deuda), ListarProductos, ListarUsuarios.
+    Lee de los procedimientos sp_Ventas_..., que leen de las vistas
+    adaptadoras.
+
+  CD_ReportesVentas
+    Un método por reporte, cada uno llama a su sp_Rpt_...
+
+
+---------------------------------------------------------------------
+7. CAPALOGICA (LAS REGLAS DEL NEGOCIO)
+---------------------------------------------------------------------
+
+Cada clase CN_ tiene adentro un objeto CD_ (private readonly ... =
+new CD_...()) y lo usa. Antes de guardar, valida. Si algo no se
+puede, tira ArgumentException con el mensaje para el usuario.
+
+CN_PresupuestosVenta
+  Alta            -> Validar, guardar cabecera, guardar líneas.
+  Modificar       -> solo si está Pendiente y activo; NO deja cambiar
+                     el cliente (compara con el original de la base);
+                     guarda la cabecera, BORRA las líneas viejas y
+                     guarda las nuevas (es más simple que comparar
+                     línea por línea).
+  Aprobar/Rechazar-> CambiarEstado: solo desde Pendiente.
+  Baja            -> solo si está activo y NO está Aprobado (un
+                     aprobado puede tener una nota de pedido colgada).
+  AgregarLinea / QuitarLinea -> validan antes de tocar la lista.
+  PuedeModificarse, PuedeDarseDeBaja, PuedeCambiarCliente
+                  -> devuelven true/false. La pantalla los usa para
+                     saber qué íconos mostrar en cada fila.
+  EsDeDeposito    -> busca al usuario en la lista y se fija su rol.
+                     Depósito no puede hacer presupuestos.
+
+CN_NotasPedido
+  Lo mismo que presupuestos, más:
+  GenerarDesdePresupuesto -> solo desde un presupuesto Aprobado,
+                     activo y que todavía no tenga nota.
+  ListarPresupuestosDisponibles -> los aprobados que todavía no
+                     tienen nota (dos foreach: por cada aprobado, se
+                     fija si alguna nota lo usa).
+  MarcarEntregado / MarcarFacturado -> CambiarEstado.
+  SiguienteEstado -> dice cuál es el estado que sigue:
+                     Pendiente->Preparado->Entregado->Facturado.
+                     Solo se puede avanzar de a un paso.
+  CambiarEstado   -> NO deja poner Preparado a mano: eso lo hace
+                     solo el aviso de Depósito.
+  PuedePasarA     -> para mostrar o no los íconos Entregado/Facturado.
+  Baja            -> solo si está Pendiente.
+
+CN_Avisos
+  Alta            -> el pedido tiene que existir, estar activo,
+                     estar Pendiente y tener líneas; la fecha del
+                     aviso no puede ser anterior a la del pedido ni
+                     futura; quien lo carga TIENE que ser de Depósito.
+  Modificar       -> solo si el aviso está activo.
+  Baja            -> solo si el pedido sigue en Preparado (si ya se
+                     entregó, no tiene sentido deshacer el aviso).
+  ListarPedidosPendientes, ListarEmpleadosDeposito (filtra usuarios
+                     con rol Deposito), EsDeDeposito.
+
+CN_ListasVentas
+  Pasa las listas de clientes, productos y usuarios.
+  ObtenerUsuario(id): busca el usuario logueado; si no está activo,
+  tira error.
+
+CN_ReportesVentas
+  Llama a cada reporte. ValidarPeriodo: "Desde" no puede ser futura
+  ni posterior a "Hasta".
+
+¿Por qué validar en la lógica Y en la base?
+  - La lógica da mensajes claros y frena antes de ir a la base.
+  - La base es la última defensa: si alguien usa otro programa o
+    llama al procedimiento directo, igual no se rompen los datos.
+
+
+---------------------------------------------------------------------
+8. CAPAVISTA (LAS PANTALLAS DE VENTAS)
+---------------------------------------------------------------------
+
+PATRÓN DE 3 PANTALLAS POR ENTIDAD (lo pidió el profe):
+
+  Lista   : FrmPresupuestosVenta, FrmNotasPedido, FrmAvisos
+            Grilla con las columnas principales, filtros arriba y
+            botón "Nuevo".
+  Datos   : FrmPresupuestoVentaDatos, FrmNotaPedidoDatos, FrmAvisoDatos
+            Alta y modificación en una ventana aparte.
+  Detalle : FrmPresupuestoVentaDetalle, FrmNotaPedidoDetalle,
+            FrmAvisoDetalle
+            Solo lectura: muestra todo, incluidas las líneas.
+
+CÓMO LA PANTALLA "DATOS" SABE SI ES NUEVO O MODIFICAR
+  Tiene dos constructores:
+    new FrmPresupuestoVentaDatos()            -> nuevo
+    new FrmPresupuestoVentaDatos(presupuesto) -> modificar ese
+  El método EsNuevo() se fija si el ID es 0. Según eso cambia el
+  título, el texto del botón y si llama a Alta o a Modificar.
+
+ÍCONOS EN CADA FILA (CapaVista\Iconos.cs)
+  - Los íconos son letras de la fuente "Segoe MDL2 Assets", que ya
+    viene con Windows. Por eso no hay imágenes en el proyecto.
+  - Las columnas de íconos se llaman "ico..." (icoDetalles,
+    icoEditar, icoAprobar, icoRechazar, icoBaja, icoEntregado,
+    icoFacturado).
+  - En el evento CellFormatting de la grilla se decide qué ícono
+    va en cada celda: Iconos.Mostrar(ícono, sePuede) devuelve el
+    ícono si la acción se puede hacer, o "" si no. Ejemplo: un
+    presupuesto Aprobado no muestra el lápiz de editar.
+  - En CellClick, Iconos.HayIcono dice si se tocó un ícono de verdad;
+    después se fija el nombre de la columna y llama a VerDetalles,
+    Editar, Aprobar, etc.
+  - CambiarCursor pone la manito, y Ayuda muestra el texto de ayuda
+    (tooltip) al pasar el mouse.
+
+FILTROS QUE SE APLICAN SOLOS (sin botón "Buscar")
+  Los combos y checks de filtro tienen el evento Filtros_Cambiaron,
+  que vuelve a llamar a ListarPresupuestos() (o ListarNotas, etc.).
+  La variable "cargando" evita que se liste muchas veces mientras se
+  llenan los combos al abrir la pantalla.
+
+CÓMO SE LLENA LA GRILLA
+  dgv.DataSource = null;  y después  dgv.DataSource = lista;
+  Poner null primero obliga a la grilla a refrescarse. En las líneas
+  se le pasa una COPIA de la lista (new List<...>(lineas)): eso
+  arregló un error de "índice -1" que pasaba al quitar líneas.
+  AutoGenerateColumns = false: las columnas están armadas en el
+  diseñador y cada una tiene su DataPropertyName.
+
+CANTIDAD SOLO ENTERA
+  - El NumericUpDown de cantidad no tiene decimales (DecimalPlaces
+    queda en 0) y su mínimo es 1.
+  - nudCantidad_KeyPress: si la tecla no es un número ni una tecla de
+    control (borrar, flechas), e.Handled = true la anula. Así no se
+    puede escribir coma ni punto.
+  - En la entidad, Cantidad es int; en la base, INT con CHECK > 0.
+
+CLIENTES DEUDORES EN ROJO (FrmNotaPedidoDatos.cs)
+  - El combo de clientes está en modo OwnerDrawFixed: nosotros lo
+    dibujamos.
+  - cboCliente_DrawItem: si cliente.EsDeudor, escribe el nombre en
+    rojo y le agrega "(debe $ ...)".
+  - MostrarDeuda(): al elegir un cliente deudor muestra una etiqueta
+    roja que avisa cuánto debe.
+  - La deuda viene de la vista vw_Ventas_DeudaClientes (notas
+    Entregadas que todavía no se facturaron). Ningún grupo de la
+    consigna registra pagos, entonces "debe" = se le entregó y no se
+    le facturó.
+
+NOTA DE PEDIDO: DIRECTA O DESDE PRESUPUESTO
+  En FrmNotaPedidoDatos hay dos opciones (radio buttons):
+  - Directo: cargás cliente y productos a mano.
+  - Desde un presupuesto aprobado: elegís el presupuesto y
+    CargarPresupuestoElegido copia el cliente y las líneas; los
+    campos se bloquean (HabilitarCarga(false)). Al guardar se llama a
+    GenerarDesdePresupuesto, y la base copia las líneas.
+
+EL CLIENTE NO SE CAMBIA AL MODIFICAR
+  cboCliente.Enabled = cn...PuedeCambiarCliente(...): solo se puede
+  elegir cliente si el documento es nuevo. Y la lógica lo vuelve a
+  controlar en Modificar (por si acaso).
+
+EL USUARIO QUE EMITE ES EL LOGUEADO
+  Si hay sesión (SesionVentas.HaySesion()), el combo "Emitido por"
+  se completa solo con el usuario logueado y se bloquea.
+
+FrmMenuVentas.cs
+  - Recibe el ID del usuario logueado (constructor con int).
+  - En Load busca al usuario (cnListas.ObtenerUsuario) y lo guarda en
+    SesionVentas.UsuarioActual.
+  - AcomodarMenu(): según el rol muestra unos botones u otros:
+      Vendedor -> Presupuestos, Notas de pedido, Reportes.
+      Depósito -> Avisos, Reportes.
+    Con un for recorre los botones, oculta los que no van y sube los
+    que quedan para que no queden huecos.
+  - Al cerrar, SesionVentas.Cerrar().
+
+SesionVentas.cs
+  Clase static con UsuarioActual: así cualquier pantalla de Ventas
+  sabe quién está usando el sistema.
+
+FrmAvisos.cs
+  - Filtros por fecha Desde/Hasta (cada uno con un check para
+    activarlo).
+  - Muestra cuántos pedidos esperan preparación.
+  - PuedeOperar(): solo un usuario de Depósito ve los íconos de
+    editar y baja.
+
+FrmReportesVentas.cs
+  - Un combo con los reportes. AgregarReporte agrega solo los que le
+    sirven al rol:
+      Ventas   -> 1. Presupuestos por cliente y estado
+                  2. Notas de pedido por estado
+      Depósito -> 3. Pedidos pendientes de preparar
+                  4. Avisos por período
+                  5. Tiempo promedio de preparación
+    La lista "reportes" guarda qué reporte real hay en cada posición
+    del combo (ReporteElegido()).
+  - AplicarFiltros() habilita solo los filtros que usa ese reporte.
+  - Generar() se llama solo cuando cambia cualquier filtro.
+
+Program.cs (de CapaVista)
+  Sirve para abrir Ventas sola, sin login (modo de prueba). El
+  programa de verdad arranca desde Vista_usuario.
+
+
+---------------------------------------------------------------------
+9. VISTA_USUARIO (GESTIÓN DE USUARIOS)
+---------------------------------------------------------------------
+
+Este módulo NO está en capas: cada formulario abre su conexión y
+llama a los procedimientos directamente (programación estructurada,
+como pidió el profe). Se le sacó la parte de "denaro" y se mejoró la
+experiencia de usuario.
+
+Program.cs -> arranca con Application.Run(new Login()).
+
+Conexion.cs -> ObtenerConexion() lee la misma cadena del
+  appsettings.json.
+
+Login.cs (btnIngresar_Click)
+  1. Si falta usuario o contraseña, avisa.
+  2. Calcula el HASH de la contraseña y llama al procedimiento
+     SP_validacion_contraseña, que devuelve (parámetros de salida)
+     si coincide, el ID, si está activo y si debe cambiar la clave.
+  3. MIGRACIÓN: si no coincide con el hash nuevo pero sí con el viejo
+     (SHA256 solo de la contraseña), actualiza la clave al formato
+     nuevo (sp_MigrarContraseña). El usuario no se entera.
+  4. Si el usuario está inactivo (dado de baja) no lo deja entrar.
+  5. Si la política pide 2FA, manda un código de 6 números por mail
+     y abre FrmCodigo2FA (3 intentos).
+  6. CargarSesion: guarda en SesionUsuario el ID, nombre, roles y
+     grupos (sp_ObtenerRolesUsuario).
+  7. AbrirSistema: si debe cambiar la clave abre FormPrimerLogin; si
+     no, el Home. Al cerrar el Home vuelve al Login (cerrar sesión).
+
+Utilidades.cs
+  - HashSHA256(texto): calcula el SHA-256 y lo pasa a texto
+    hexadecimal ("x2" = 2 dígitos hexadecimales por byte).
+  - HashContraseña(contraseña, usuario) = SHA256(contraseña +
+    usuario). Se le suma el usuario (eso se llama "sal") para que
+    dos personas con la misma clave no tengan el mismo hash.
+  - GenerarContraseña(): 10 caracteres al azar (sin letras que se
+    confunden como l, I, O, 0, 1).
+  - GenerarCodigo(): número al azar de 6 cifras para el 2FA.
+  - OcultarCorreo: muestra "ju***@gmail.com".
+  - SoloNumeros: el mismo truco del KeyPress para el DNI y el código.
+
+¿Por qué hash y no la contraseña guardada?
+  El hash es de una sola vía: no se puede volver atrás. En la base
+  nunca está la contraseña real. Para verificar, se hashea lo que
+  escribió el usuario y se compara con el hash guardado.
+
+SesionUsuario.cs
+  Static: IdUsuario, NombreUsuario, NombreCompleto, Roles, Familias
+  (grupos). TieneFamilia("Ventas") dice si el usuario es de ese grupo.
+
+frmHome.cs
+  Muestra los botones según el GRUPO del usuario:
+    Ventas         -> botón Ventas (abre CapaVista.FrmMenuVentas
+                      pasándole SesionUsuario.IdUsuario). ACÁ SE UNEN
+                      LOS DOS MÓDULOS.
+    Otros módulos  -> botón que abre FrmEnConstruccion.
+    Administración -> Administrar usuarios y Políticas.
+    Todos          -> Mi cuenta y Cerrar sesión.
+  Mismo truco que el menú de Ventas: arrays de botones y de bool, y
+  un for que oculta y acomoda.
+
+Administracion_Usuarios.cs
+  Lista de usuarios (sp_ListarUsuariosCompletos) con filtros
+  automáticos y los mismos íconos por fila que Ventas (usa la clase
+  CapaVista.Iconos): editar y dar de baja / reactivar
+  (sp_CambiarEstadoUsuario). Los inactivos se ven en gris.
+
+FrmUsuarioDatos.cs (alta y edición de usuario)
+  - Validar(): campos obligatorios, documento, correo, que la persona
+    no exista ya (sp_VerificarPersonaDuplicada).
+  - El nombre de usuario se arma solo: inicial del nombre + apellido
+    (GenerarUsuarioBase). Si ya existe, le agrega 1, 2, 3...
+    (GenerarUsuarioUnico, con un while).
+  - DarDeAlta: genera una contraseña al azar, guarda su hash
+    (sp_RegistrarUsuario) y le manda los datos por mail. El usuario
+    queda con debe_cambiar_clave = 1.
+  - Modificar: sp_ModificarUsuarioCompleto.
+
+FormPrimerLogin.cs
+  Obliga a poner una contraseña nueva (que cumpla las políticas) y a
+  responder las preguntas de seguridad. Guarda con
+  sp_CambiarContraseñaPrimerLogin (que pone debe_cambiar_clave en 0
+  y anota la clave en Historial_Pass) y
+  sp_GuardarRespuestaSeguridad.
+
+FrmRecuperarContra.cs ("Olvidé mi contraseña")
+  Pide el usuario, muestra sus preguntas de seguridad, valida las
+  respuestas (sp_ValidarRespuesta) y, si están bien, genera una
+  contraseña nueva, la manda por mail y la guarda
+  (sp_RestablecerContraseña). Al entrar con esa, te obliga a
+  cambiarla.
+
+frmSeguridad.cs ("Mi cuenta")
+  Cambiar la contraseña (primero confirma la actual) y cambiar las
+  respuestas de seguridad.
+
+Politicas.cs + frmPoliticas.cs
+  - La tabla Politicas_Seguridad guarda las reglas: mínimo de
+    caracteres, mayúscula y minúscula, números y letras, carácter
+    especial, 2FA, no repetir claves anteriores, no usar datos
+    personales.
+  - frmPoliticas: el administrador las cambia.
+  - Politicas.Cargar() las lee; Politicas.Cumple(pass, ...) revisa
+    cada regla (con Regex, por ejemplo "[A-Z]" = tiene alguna
+    mayúscula) y devuelve el mensaje de error.
+  - ExisteEnHistorial: compara el hash con Historial_Pass.
+  - ContieneDatosPersonales: que no tenga el nombre, apellido o DNI.
+
+ArmarMail.cs + EnviarMail.cs
+  - ArmarMail prepara el asunto y el texto del mail (alta, clave
+    nueva, código de ingreso).
+  - EnviarMail.sendMail lo manda por Gmail (smtp.gmail.com, puerto
+    587, con SSL). La cuenta y la clave están en correo.json, que NO
+    se sube a GitHub (está en .gitignore) porque es una clave real.
+    En GitHub solo está correo.ejemplo.json, vacío.
+
+FrmCodigo2FA.cs
+  Pide el código de 6 números; 3 intentos y después vuelve al login.
+
+
+---------------------------------------------------------------------
+10. ¿DÓNDE ESTÁ...? (ÍNDICE RÁPIDO PARA LA DEFENSA)
+---------------------------------------------------------------------
+
+LA CONEXIÓN A LA BASE
+  CapaVista\appsettings.json (la cadena)
+  CapaDatos\Conexion.cs (la lee Ventas)
+  Vista_usuario\Conexion.cs (la lee Usuarios)
+
+DÓNDE SE EJECUTAN LOS PROCEDIMIENTOS
+  CapaDatos\CD_EjecutarConsultasSP.cs -> EjecutarConsulta
+
+DÓNDE SE CREAN LAS TABLAS
+  BaseDeDatos\2_ModuloGrupo7.sql (las nuestras)
+  BaseDeDatos\0_GestionUsuarios.sql (las de usuarios)
+
+ALTA DE UN PRESUPUESTO
+  Vista : FrmPresupuestoVentaDatos.btnGuardar_Click
+  Lógica: CN_PresupuestosVenta.Alta
+  Datos : CD_PresupuestosVenta.Alta
+  Base  : sp_PresupuestoVenta_Alta
+
+APROBAR / RECHAZAR UN PRESUPUESTO
+  Vista : FrmPresupuestosVenta (íconos, métodos Aprobar y Rechazar)
+  Lógica: CN_PresupuestosVenta.Aprobar / Rechazar -> CambiarEstado
+  Base  : sp_PresupuestoVenta_CambiarEstado
+
+GENERAR LA NOTA DESDE UN PRESUPUESTO
+  Vista : FrmNotaPedidoDatos (rdbDesdePresupuesto,
+          CargarPresupuestoElegido, btnGuardar_Click)
+  Lógica: CN_NotasPedido.GenerarDesdePresupuesto
+  Base  : sp_NotaPedido_GenerarDesdePresupuesto (con transacción)
+
+QUE NO SE PUEDA GENERAR DOS NOTAS DEL MISMO PRESUPUESTO
+  CN_NotasPedido.TieneNotaDePedido y
+  ListarPresupuestosDisponibles; y en la base, el IF EXISTS de
+  sp_NotaPedido_GenerarDesdePresupuesto.
+
+EL ORDEN DE LOS ESTADOS DE LA NOTA
+  CN_NotasPedido.SiguienteEstado y CambiarEstado
+
+QUE LA NOTA PASE A PREPARADO SOLA
+  sp_Aviso_Alta (UPDATE Notas_Pedido SET Estado = 'Preparado')
+
+QUE LA NOTA VUELVA A PENDIENTE SI SE DA DE BAJA EL AVISO
+  sp_Aviso_Baja
+
+BAJA LÓGICA
+  Columna Activo (Ventas) / estado (Usuarios). Los procedimientos
+  _Baja hacen UPDATE ... SET Activo = 0, nunca DELETE.
+  Reglas: CN_...PuedeDarseDeBaja.
+
+CLIENTES DEUDORES EN ROJO (LISTA NEGRA)
+  Base  : vista vw_Ventas_DeudaClientes + sp_Ventas_ListarClientes
+  Entidad: ClienteVentas.Deuda y EsDeudor
+  Vista : FrmNotaPedidoDatos.cboCliente_DrawItem y MostrarDeuda
+
+CANTIDAD SOLO NÚMEROS ENTEROS
+  FrmPresupuestoVentaDatos y FrmNotaPedidoDatos -> nudCantidad_KeyPress
+  (y el NumericUpDown sin decimales, mínimo 1)
+
+NO SE PUEDE CAMBIAR EL CLIENTE AL MODIFICAR
+  CN_PresupuestosVenta / CN_NotasPedido -> PuedeCambiarCliente y el
+  control dentro de Modificar.
+
+DEPÓSITO NO PUEDE HACER PRESUPUESTOS NI NOTAS
+  CN_PresupuestosVenta.Validar y CN_NotasPedido.Validar ->
+  EsDeDeposito. Y el menú ni muestra esos botones
+  (FrmMenuVentas.AcomodarMenu).
+
+SOLO DEPÓSITO CARGA AVISOS
+  CN_Avisos.Validar (EsDeDeposito) y FrmAvisos.PuedeOperar
+
+CÓMO SE SABE QUE ALGUIEN ES DE DEPÓSITO
+  vw_Ventas_Usuarios devuelve 'Deposito' -> UsuarioVentas.EsDeposito
+
+MENÚ SEGÚN EL ROL
+  Home: Vista_usuario\frmHome.cs (frmHome_Load)
+  Ventas: CapaVista\FrmMenuVentas.cs (AcomodarMenu)
+
+REPORTES SEGÚN EL ROL
+  CapaVista\FrmReportesVentas.cs (FrmReportesVentas_Load,
+  AgregarReporte)
+
+LOS ÍCONOS DE CADA FILA
+  CapaVista\Iconos.cs + los eventos CellFormatting y CellClick de
+  cada lista.
+
+FILTROS AUTOMÁTICOS
+  Método Filtros_Cambiaron de cada lista y de reportes.
+
+DÓNDE SE UNEN EL LOGIN Y VENTAS
+  Vista_usuario\frmHome.cs -> btnVentas_Click -> new
+  CapaVista.FrmMenuVentas(SesionUsuario.IdUsuario)
+
+LOGIN
+  Vista_usuario\Login.cs (btnIngresar_Click) + SP_validacion_contraseña
+
+HASH DE CONTRASEÑAS
+  Vista_usuario\Utilidades.cs (HashSHA256, HashContraseña)
+
+PRIMER INGRESO (CAMBIO DE CLAVE OBLIGATORIO)
+  Columna Usuario.debe_cambiar_clave + FormPrimerLogin.cs
+
+RECUPERAR CONTRASEÑA
+  Vista_usuario\FrmRecuperarContra.cs
+
+DOS PASOS (2FA)
+  Login.VerificarSegundoPaso + FrmCodigo2FA.cs
+
+POLÍTICAS DE CONTRASEÑA
+  Vista_usuario\Politicas.cs (Cumple) + frmPoliticas.cs
+
+ENVÍO DE MAILS
+  Vista_usuario\EnviarMail.cs + correo.json
+
+LOS TOTALES
+  En C#: CalcularTotal() de PresupuestoVenta y NotaPedido.
+  En la base: columna Total de vw_Presupuesto_Venta y vw_Nota_Pedido.
+
+LOS 5 REPORTES
+  Base: sp_Rpt_... (al final de 2_ModuloGrupo7.sql)
+  C#  : CD_ReportesVentas, CN_ReportesVentas, FrmReportesVentas,
+        y las clases Reporte... de CapaEntidades.
+
+LAS PRUEBAS AUTOMÁTICAS
+  BaseDeDatos\3_DatosYPruebas_Grupo7.sql (PRUEBA 1 a 8)
+
+
+---------------------------------------------------------------------
+11. PREGUNTAS QUE PUEDE HACER EL PROFE, CON RESPUESTA
+---------------------------------------------------------------------
+
+P: ¿Por qué usaron capas?
+R: Para separar responsabilidades. La vista muestra, la lógica
+   decide qué se puede hacer y los datos hablan con la base. Si
+   cambia algo de la base, solo tocamos CapaDatos.
+
+P: ¿Qué pasa si el usuario hace algo que no se puede?
+R: La lógica tira un ArgumentException con un mensaje. La pantalla
+   lo atrapa con try/catch y lo muestra en un MessageBox. Si la base
+   rechaza algo, el RAISERROR llega como error 50000 y
+   CD_EjecutarConsultasSP lo pasa con el mismo mensaje.
+
+P: ¿Por qué validan dos veces, en C# y en SQL?
+R: C# da mensajes claros antes de ir a la base. La base es la última
+   protección: aunque alguien la use desde otro programa, los datos
+   no quedan mal.
+
+P: ¿Por qué no borran los registros?
+R: Baja lógica. Un presupuesto puede estar relacionado con una nota
+   de pedido; si lo borramos perdemos la historia. Lo marcamos
+   inactivo y se puede ver con el check "Mostrar los dados de baja".
+
+P: ¿Qué es una transacción y dónde la usan?
+R: Varias operaciones que pasan todas juntas o ninguna. La usamos al
+   cargar un aviso (insertar aviso + pasar la nota a Preparado), al
+   dar de baja un aviso y al generar una nota desde un presupuesto
+   (crear la nota + copiar las líneas). Si falla algo, ROLLBACK.
+
+P: ¿Cómo sabe el sistema quién está logueado?
+R: Login guarda los datos en SesionUsuario (clase static). El Home le
+   pasa el ID al menú de Ventas, que busca al usuario y lo guarda en
+   SesionVentas.UsuarioActual.
+
+P: ¿Cómo guardan las contraseñas?
+R: Nunca la contraseña real: guardamos SHA256(contraseña + usuario).
+   Al loguear se calcula el hash de lo que escribiste y se compara.
+
+P: ¿Cómo hicieron lo de los deudores en rojo?
+R: La vista vw_Ventas_DeudaClientes suma las notas Entregadas sin
+   facturar de cada cliente. El combo de clientes lo dibujamos
+   nosotros (DrawItem) y si el cliente debe, lo pinta de rojo.
+
+P: ¿Por qué la cantidad es int y el precio decimal?
+R: Se venden unidades enteras. El precio es plata, y decimal es el
+   tipo para dinero porque no tiene errores de redondeo como double.
+
+P: ¿Qué es una vista y por qué las usan?
+R: Una consulta guardada con nombre. Las usamos para no leer
+   directo las tablas de otros grupos: si ellos cambian una columna,
+   solo ajustamos la vista. Y para tener el total y los nombres ya
+   calculados.
+
+P: ¿Qué es una clave foránea?
+R: Una columna que apunta al ID de otra tabla. Asegura que no puedas
+   poner, por ejemplo, un cliente que no existe.
+
+P: ¿Por qué la pantalla de modificar es otra ventana?
+R: Lo pidió el profe. Es la misma ventana "Datos": con el constructor
+   vacío es alta, y si le pasás un objeto es modificación.
+
+P: ¿Cómo se refresca la lista después de guardar?
+R: La ventana Datos se abre con ShowDialog(). Si guardó bien, pone
+   DialogResult.OK; la lista lo ve y vuelve a listar.
+
+P: ¿Por qué un usuario de Depósito no puede hacer presupuestos?
+R: Es una regla del negocio: los presupuestos y pedidos son de
+   Ventas. Está en la lógica (Validar -> EsDeDeposito) y además el
+   menú ni le muestra esos botones.
+
+P: ¿Qué hace "using" en el código de datos?
+R: Cierra y libera la conexión automáticamente cuando termina, aunque
+   haya un error. Así no quedan conexiones abiertas.
+
+P: ¿Qué es un parámetro de salida (Output)?
+R: Un parámetro que el procedimiento llena y C# lee después. Lo
+   usamos para recibir el ID nuevo (@ID) y en el login (si
+   coincide, si está activo, etc.).
+
+P: ¿Por qué el módulo de usuarios no está en capas?
+R: Porque el profe nos dijo que ese módulo quede en programación
+   estructurada; solo le mejoramos la experiencia de usuario.
+
+
+---------------------------------------------------------------------
+12. COSAS DE C# QUE APARECEN EN EL CÓDIGO Y QUÉ SIGNIFICAN
+---------------------------------------------------------------------
+
+class / objeto
+  La clase es el molde (PresupuestoVenta); el objeto es uno concreto
+  (new PresupuestoVenta()).
+
+Propiedad { get; set; }
+  Un dato de la clase que se puede leer y escribir.
+
+Propiedad calculada (solo get)
+  No guarda nada: calcula cada vez. Ej: Subtotal, EsDeudor,
+  EstadoTexto.
+
+const
+  Valor fijo que no cambia: PENDIENTE = "Pendiente".
+
+Constructor y : this(...)
+  El constructor se ejecuta al hacer new. ": this(...)" llama primero
+  a otro constructor de la misma clase, para no repetir código.
+
+Herencia ( : )
+  CD_PresupuestosVenta : CD_EjecutarConsultasSP significa que hereda
+  sus métodos (EjecutarConsulta, ValorONulo, GetConexion).
+
+abstract
+  Clase que no se puede usar con new; solo sirve para heredar
+  (Conexion y CD_EjecutarConsultasSP).
+
+protected / private / public
+  public: lo ve cualquiera. private: solo la misma clase. protected:
+  la clase y las que heredan de ella.
+
+static
+  Pertenece a la clase y no a un objeto. Se usa en SesionUsuario,
+  SesionVentas, Iconos, Utilidades: hay una sola y se usa sin new.
+
+readonly
+  Se asigna una vez y no se cambia más (los objetos CN_ y CD_ que
+  tiene cada clase).
+
+override ToString()
+  Cambia cómo se ve el objeto como texto (por ejemplo en un combo).
+
+int? (con signo de pregunta)
+  Un int que también puede ser null. Se usa para filtros opcionales y
+  para IdPresupuesto de la nota (null = pedido directo).
+
+List<T>
+  Lista de objetos del mismo tipo: List<PresupuestoVenta>.
+
+foreach
+  Recorre una lista elemento por elemento.
+
+try / catch
+  try intenta; si hay un error, salta al catch, que muestra el
+  mensaje en vez de que el programa se cierre.
+
+throw new ArgumentException("...")
+  Corta el método y manda un error con ese mensaje hacia arriba.
+
+out
+  Un parámetro que el método llena para devolver más de un valor
+  (Login.ValidarCredenciales devuelve el ID, si es primer login y si
+  está activo).
+
+using (...) { }
+  Libera el recurso (conexión, comando) al terminar.
+
+Eventos (..._Click, ..._Load, ..._CellClick)
+  Métodos que Windows Forms llama solo cuando pasa algo: un clic, se
+  abre la ventana, se toca una celda. Se conectan en el diseñador
+  (rayito de Propiedades).
+
+sender y e
+  sender es el control que disparó el evento; e trae datos del evento
+  (por ejemplo e.RowIndex = qué fila se tocó, e.KeyChar = qué tecla).
+
+ShowDialog() y DialogResult
+  ShowDialog abre la ventana y espera a que se cierre. DialogResult
+  dice cómo se cerró (OK = guardó, Cancel = canceló).
+
+DataSource
+  Le das una lista a la grilla o al combo y se llena sola.
+  DisplayMember = qué se ve; ValueMember = qué valor tiene
+  (normalmente el ID).
+
+SqlConnection / SqlCommand / SqlParameter
+  La conexión, el comando (qué procedimiento ejecutar) y cada dato
+  que se le pasa. CommandType.StoredProcedure indica que es un
+  procedimiento almacenado.
+
+DataTable / DataRow
+  La tabla que vuelve de la base, en memoria, y cada fila. Después se
+  pasa a objetos con Convert.ToInt32(fila["ID"]), etc.
+
+DBNull.Value
+  El "null" de la base de datos (no es lo mismo que el null de C#).
